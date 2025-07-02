@@ -1,0 +1,10 @@
+[package]
+name = "macros"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+quote = "1.0.40"
+syn = { version = "2.0.103", features = ["full"] }
+macro_impl = { path = "macro_impl" }
