@@ -91,6 +91,7 @@ impl<Extra: Clone + Send + Sync> Debug for Route<Extra> {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 

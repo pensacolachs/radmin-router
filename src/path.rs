@@ -70,6 +70,7 @@ impl<A> From<A> for Path where A: AsRef<[Segment]> {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
