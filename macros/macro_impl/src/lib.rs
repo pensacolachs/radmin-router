@@ -1,7 +1,7 @@
 use syn::punctuated::Punctuated;
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, parse_quote, parse_quote_spanned, Data, DeriveInput, Expr, Fields, ItemFn, ReturnType, Stmt, Token};
+use syn::{parse_macro_input, parse_quote, parse_quote_spanned, Data, DeriveInput, Expr, Fields, ItemFn, ReturnType, Token};
 
 #[proc_macro_attribute]
 pub fn box_future(_args: proc_macro::TokenStream, input: proc_macro::TokenStream) -> proc_macro::TokenStream {
