@@ -7,30 +7,27 @@ use futures::future::BoxFuture;
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Full};
 use hyper::body::Incoming;
-use hyper::{header, Request, Response, StatusCode};
+use hyper::{Request, Response, StatusCode, header};
 use std::fmt::Debug;
 use std::sync::Arc;
+
+#[cfg(feature = "logging")]
 use std::time::Instant;
 
-type RouteNotFoundHandler<Extra> = fn(
-    Request<Incoming>,
-    Arc<Extra>,
-) -> BoxFuture<'static, crate::Result>;
-type MethodNotAllowedHandler<Extra> = fn(
-    Route<Extra>,
-    Request<Incoming>,
-    Context<Extra>,
-) -> BoxFuture<'static, crate::Result>;
+type RouteNotFoundHandler<Extra> =
+    fn(Request<Incoming>, Arc<Extra>) -> BoxFuture<'static, crate::Result>;
+type MethodNotAllowedHandler<Extra> =
+    fn(Route<Extra>, Request<Incoming>, Context<Extra>) -> BoxFuture<'static, crate::Result>;
 
 #[derive(Clone, Debug)]
-pub struct Router<Extra: Clone + Debug + Send + Sync> {
+pub struct Router<Extra: Debug + Send + Sync> {
     ex: Arc<Extra>,
     root: Node<Extra>,
     route_not_found: RouteNotFoundHandler<Extra>,
-    method_not_allowed: MethodNotAllowedHandler<Extra>
+    method_not_allowed: MethodNotAllowedHandler<Extra>,
 }
 
-impl<Extra: Clone + Debug + Send + Sync + 'static> Router<Extra> {
+impl<Extra: Debug + Send + Sync + 'static> Router<Extra> {
     pub fn new(ex: impl Into<Arc<Extra>>) -> Self {
         Self {
             ex: ex.into(),
@@ -58,7 +55,7 @@ impl<Extra: Clone + Debug + Send + Sync + 'static> Router<Extra> {
                         .body(full("Method Not Allowed"))
                         .unwrap())
                 })
-            }
+            },
         }
     }
 
@@ -142,9 +139,11 @@ impl<Extra: Clone + Debug + Send + Sync + 'static> Router<Extra> {
         self: Arc<Self>,
         req: Request<Incoming>,
     ) -> Result<Response<BoxBody<Bytes, hyper::Error>>, hyper::Error> {
+        #[cfg(feature = "logging")]
         let before = Instant::now();
-
+        #[cfg(feature = "logging")]
         let method = req.method().clone();
+
         let path = req.uri().path().to_string();
 
         let Some((route, params)) = self.match_route(&path) else {
@@ -162,11 +161,11 @@ impl<Extra: Clone + Debug + Send + Sync + 'static> Router<Extra> {
 
         let resp = handler(req, ctx).await;
 
-        let elapsed = before.elapsed();
-
         #[cfg(feature = "logging")]
         {
             use chrono::Utc;
+
+            let elapsed = before.elapsed();
             match resp {
                 Ok(ref resp) => {
                     let status_code = resp.status().as_u16();
@@ -175,9 +174,9 @@ impl<Extra: Clone + Debug + Send + Sync + 'static> Router<Extra> {
                         300..=399 => 95, // bright magenta
                         400..=499 => 93, // bright yellow
                         500..=599 => 91, // bright red
-                        _ => 97 // white
+                        _ => 97,         // white
                     };
-                    
+
                     println!(
                         "\x1B[34m[{}] \x1B[{status_color}m{}\x1B[97m {:6} {} \x1B[37m({:?})",
                         Utc::now().format("%Y-%m-%d %H:%M:%S"),
@@ -192,7 +191,11 @@ impl<Extra: Clone + Debug + Send + Sync + 'static> Router<Extra> {
                     println!(
                         "\x1B[34m[{}]\x1B[91m Error\x1B[97m {:6} {} ({:?}) => {:?}",
                         Utc::now().format("%Y-%m-%d %H:%M:%S"),
-                        method, path, elapsed, err);
+                        method,
+                        path,
+                        elapsed,
+                        err
+                    );
                 }
             }
         }

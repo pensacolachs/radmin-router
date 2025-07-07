@@ -1,10 +1,10 @@
-use std::collections::HashMap;
 use crate::context::Context;
 use crate::path::Path;
 use bytes::Bytes;
 use http_body_util::combinators::BoxBody;
 use hyper::body::Incoming;
 use hyper::{Method, Request};
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::pin::Pin;
 
@@ -13,24 +13,30 @@ pub type ResponseFut = dyn Future<Output = Response> + Send + 'static;
 
 pub type Handler<Extra> = fn(Request<Incoming>, Context<Extra>) -> Pin<Box<ResponseFut>>;
 
-#[derive(Clone)]
-pub struct Route<Extra: Clone + Send + Sync> {
+pub struct Route<Extra: Send + Sync> {
     pub path: Path,
     handlers: HashMap<Method, Handler<Extra>>,
 }
 
-impl<Extra: Clone + Send + Sync> Route<Extra> {
+impl<Extra: Send + Sync> Clone for Route<Extra> {
+    fn clone(&self) -> Self {
+        Self {
+            path: Clone::clone(&self.path),
+            handlers: Clone::clone(&self.handlers),
+        }
+    }
+}
+
+impl<Extra: Send + Sync> Route<Extra> {
     pub fn new(path: impl Into<Path>) -> Self {
         Self {
             path: path.into(),
-            handlers: Default::default()
+            handlers: Default::default(),
         }
     }
 
     pub fn allowed_methods(&self) -> Vec<Method> {
-        self.handlers.keys()
-            .map(|m| m.clone())
-            .collect()
+        self.handlers.keys().map(|m| m.clone()).collect()
     }
 
     pub(crate) fn handler(&self, method: &Method) -> Option<Handler<Extra>> {
@@ -79,7 +85,7 @@ impl<Extra: Clone + Send + Sync> Route<Extra> {
     }
 }
 
-impl<Extra: Clone + Send + Sync> Debug for Route<Extra> {
+impl<Extra: Send + Sync> Debug for Route<Extra> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut debug = f.debug_tuple("Route");
 
@@ -104,12 +110,12 @@ mod tests {
 
         assert_eq!(route.allowed_methods(), vec![Method::GET, Method::PATCH]);
     }
-    
+
     #[test]
     fn register_handler() {
         let mut route = Route::<()>::new(vec![]);
         assert!(route.handler(&Method::GET).is_none());
-        
+
         route.get(|_, _| unimplemented!());
         assert!(route.handler(&Method::GET).is_some());
     }

@@ -1,13 +1,21 @@
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
-#[derive(Clone)]
-pub struct Context<Extra: Clone> {
+pub struct Context<Extra> {
     pub params: Vec<String>,
     pub ex: Arc<Extra>,
 }
 
-impl<Extra: Clone> Debug for Context<Extra>
+impl<Extra> Clone for Context<Extra> {
+    fn clone(&self) -> Self {
+        Self {
+            params: Clone::clone(&self.params),
+            ex: Arc::clone(&self.ex),
+        }
+    }
+}
+
+impl<Extra> Debug for Context<Extra>
 where
     Extra: Debug,
 {

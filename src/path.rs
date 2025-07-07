@@ -7,7 +7,7 @@ use std::str::FromStr;
 macro_rules! path {
     ($path:literal) => {{
         use std::str::FromStr;
-        ::radmin_router::path::Path::from_str($path).unwrap()
+        ::radmin_router::Path::from_str($path).unwrap()
     }};
 }
 
@@ -16,7 +16,8 @@ pub struct Path(pub Vec<Segment>);
 
 impl Display for Path {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let formatted = self.0
+        let formatted = self
+            .0
             .iter()
             .map(|seg| match seg {
                 Segment::Dynamic(name) => format!("[{}]", name),
@@ -64,7 +65,10 @@ impl FromStr for Path {
     }
 }
 
-impl<A> From<A> for Path where A: AsRef<[Segment]> {
+impl<A> From<A> for Path
+where
+    A: AsRef<[Segment]>,
+{
     fn from(value: A) -> Self {
         Self(value.as_ref().to_vec())
     }

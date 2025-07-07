@@ -2,13 +2,22 @@ use crate::route::Route;
 use crate::segment::Segment;
 use std::collections::HashMap;
 
-#[derive(Clone, Debug)]
-pub struct Node<Extra: Clone + Send + Sync> {
+#[derive(Debug)]
+pub struct Node<Extra: Send + Sync> {
     pub route: Option<Route<Extra>>,
     pub children: HashMap<Segment, Node<Extra>>,
 }
 
-impl<Extra: Clone + Send + Sync> Default for Node<Extra> {
+impl<Extra: Send + Sync> Clone for Node<Extra> {
+    fn clone(&self) -> Self {
+        Self {
+            route: Clone::clone(&self.route),
+            children: Clone::clone(&self.children),
+        }
+    }
+}
+
+impl<Extra: Send + Sync> Default for Node<Extra> {
     fn default() -> Self {
         Self {
             route: None,
@@ -17,7 +26,7 @@ impl<Extra: Clone + Send + Sync> Default for Node<Extra> {
     }
 }
 
-impl<Extra: Clone + Send + Sync> Node<Extra> {
+impl<Extra: Send + Sync> Node<Extra> {
     pub fn append(&mut self, route: Route<Extra>) {
         let mut current = self;
 

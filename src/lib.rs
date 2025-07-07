@@ -8,8 +8,8 @@ mod route;
 mod router;
 mod segment;
 
-pub use macros;
 pub use context::*;
+pub use macros;
 pub use path::*;
 pub use route::*;
 pub use router::*;
