@@ -1,8 +1,7 @@
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 
-/// A URL path segment. All dynamic segments are equal regardless
-/// of their name.
+/// A URL path segment.
 #[derive(Clone)]
 pub enum Segment {
     /// A fixed, literal path segment that is matched exactly.
@@ -11,19 +10,19 @@ pub enum Segment {
     /// All dynamic segments are considered equal regardless of
     /// their name.
     ///
-    /// `/some/(dynamic)/segment` matches
+    /// `/some/[dynamic]/segment` matches
     /// - `/some/cool/segment` and
-    /// - `/some/unknown/segment`
+    /// - `/some/other/segment`
     Dynamic(String),
 }
 
 impl Segment {
-    /// Constructs a literal segment from any `Into<String>`
+    /// Constructs a literal segment from any `Into<String>`.
     pub fn literal(literal: impl Into<String>) -> Self {
         Self::Literal(literal.into())
     }
 
-    /// Constructs a dynamic segment from any `Into<String>
+    /// Constructs a dynamic segment from any `Into<String>`.
     pub fn dynamic(dynamic: impl Into<String>) -> Self {
         Self::Dynamic(dynamic.into())
     }

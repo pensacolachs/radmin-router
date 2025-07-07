@@ -11,6 +11,7 @@ macro_rules! path {
     }};
 }
 
+/// A route path, i.e. an ordered list of segments.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Path(pub Vec<Segment>);
 
@@ -37,6 +38,7 @@ impl Display for Path {
 impl FromStr for Path {
     type Err = Infallible;
 
+    /// Infallibly parses a `Path` from a string.
     fn from_str(path: &str) -> Result<Self, Self::Err> {
         let path = path.to_string();
 

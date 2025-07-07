@@ -1,8 +1,8 @@
 use crate::route::Route;
 use crate::segment::Segment;
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 
-#[derive(Debug)]
 pub struct Node<Extra: Send + Sync> {
     pub route: Option<Route<Extra>>,
     pub children: HashMap<Segment, Node<Extra>>,
@@ -14,6 +14,15 @@ impl<Extra: Send + Sync> Clone for Node<Extra> {
             route: Clone::clone(&self.route),
             children: Clone::clone(&self.children),
         }
+    }
+}
+
+impl<Extra: Send + Sync> Debug for Node<Extra> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Node")
+            .field("route", &self.route)
+            .field("children", &self.children)
+            .finish()
     }
 }
 

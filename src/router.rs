@@ -19,18 +19,35 @@ type RouteNotFoundHandler<Extra> =
 type MethodNotAllowedHandler<Extra> =
     fn(Route<Extra>, Request<Incoming>, Context<Extra>) -> BoxFuture<'static, crate::Result>;
 
-#[derive(Clone, Debug)]
-pub struct Router<Extra: Debug + Send + Sync> {
+#[derive(Debug)]
+pub struct Router<Extra: Send + Sync> {
     ex: Arc<Extra>,
     root: Node<Extra>,
     route_not_found: RouteNotFoundHandler<Extra>,
     method_not_allowed: MethodNotAllowedHandler<Extra>,
 }
 
-impl<Extra: Debug + Send + Sync + 'static> Router<Extra> {
-    pub fn new(ex: impl Into<Arc<Extra>>) -> Self {
+impl<Extra: Send + Sync> Clone for Router<Extra> {
+    fn clone(&self) -> Self {
         Self {
-            ex: ex.into(),
+            ex: Clone::clone(&self.ex),
+            root: Clone::clone(&self.root),
+            route_not_found: Clone::clone(&self.route_not_found),
+            method_not_allowed: Clone::clone(&self.method_not_allowed),
+        }
+    }
+}
+
+impl<Extra: Default + Send + Sync> Default for Router<Extra> {
+    fn default() -> Self {
+        Self::new(Arc::new(Default::default()))
+    }
+}
+
+impl<Extra: Send + Sync> Router<Extra> {
+    pub fn new(ex: Arc<Extra>) -> Self {
+        Self {
+            ex,
             root: Node::default(),
             route_not_found: |_, _| {
                 Box::pin(async {
@@ -41,14 +58,13 @@ impl<Extra: Debug + Send + Sync + 'static> Router<Extra> {
                 })
             },
             method_not_allowed: |route, _, _| {
-                Box::pin(async move {
-                    let allowed_methods = route
-                        .allowed_methods()
-                        .into_iter()
-                        .map(|m| m.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ");
+                let allowed_methods = route.allowed_methods()
+                    .into_iter()
+                    .map(|m| m.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
 
+                Box::pin(async move {
                     Ok(Response::builder()
                         .status(StatusCode::METHOD_NOT_ALLOWED)
                         .header(header::ALLOW, allowed_methods)
@@ -59,18 +75,86 @@ impl<Extra: Debug + Send + Sync + 'static> Router<Extra> {
         }
     }
 
+    /// Registers a handler to generate a response when no route is matched.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radmin_router::{Router, empty};
+    /// use std::sync::Arc;
+    /// use http_body_util::{BodyExt, Empty};
+    /// use hyper::Response;
+    ///
+    /// Router::<()>::default()
+    ///     .route_not_found(|req, ex| {
+    ///         Box::pin(async move {
+    ///             Ok(Response::builder()
+    ///                 .status(404)
+    ///                 .body(empty())
+    ///                 .unwrap())
+    ///         })
+    ///     });
+    /// ```
     pub fn route_not_found(&mut self, handler: RouteNotFoundHandler<Extra>) -> &mut Self {
         self.route_not_found = handler;
         self
     }
 
+    /// Registers a handler to generate a response when a route without a handler
+    /// for the requested method is matched.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use radmin_router::{Router, full};
+    /// use std::sync::Arc;
+    /// use http_body_util::{BodyExt, Empty};
+    /// use hyper::Response;
+    ///
+    /// Router::<()>::default()
+    ///     .method_not_allowed(|route, req, ex| {
+    ///         let methods = route.allowed_methods()
+    ///             .into_iter()
+    ///             .map(|m| m.to_string())
+    ///             .collect::<Vec<_>>()
+    ///             .join(", ");
+    ///
+    ///         Box::pin(async move {
+    ///             Ok(Response::builder()
+    ///                 .status(405)
+    ///                 .header("Allow", methods)
+    ///                 .body(full("Method Not Allowed"))
+    ///                 .unwrap())
+    ///         })
+    ///     });
+    /// ```
     pub fn method_not_allowed(&mut self, handler: MethodNotAllowedHandler<Extra>) -> &mut Self {
         self.method_not_allowed = handler;
         self
     }
 
-    pub fn register(mut self, route: &Route<Extra>) -> Self {
-        self.root.append(route.clone());
+    /// Registers a route, replacing an existing route with an equivalent path.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use hyper::Response;
+    /// use radmin_router::{full, path, Route, Router};
+    ///
+    /// let route = Route::new(path!("/"))
+    ///     .get(|req, ctx| {
+    ///     Box::pin(async move {
+    ///         Ok(Response::builder()
+    ///             .status(200)
+    ///             .body(full("OK"))
+    ///             .unwrap())
+    ///     })
+    /// });
+    ///
+    /// Router::<()>::default()
+    ///     .register(route);
+    pub fn register(mut self, route: Route<Extra>) -> Self {
+        self.root.append(route);
         self
     }
 
@@ -83,7 +167,7 @@ impl<Extra: Debug + Send + Sync + 'static> Router<Extra> {
         self
     }
 
-    pub fn match_route(&self, path: impl AsRef<str>) -> Option<(Route<Extra>, Vec<String>)> {
+    fn match_route(&self, path: impl AsRef<str>) -> Option<(Route<Extra>, Vec<String>)> {
         let segments = path
             .as_ref()
             .trim_start_matches('/')
@@ -135,6 +219,7 @@ impl<Extra: Debug + Send + Sync + 'static> Router<Extra> {
         Some((route.clone(), params))
     }
 
+    /// Processes an incoming request and generates a response for hyper.
     pub async fn route(
         self: Arc<Self>,
         req: Request<Incoming>,

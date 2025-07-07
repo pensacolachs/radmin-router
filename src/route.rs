@@ -8,26 +8,29 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::pin::Pin;
 
+/// The standard return type for all handlers. Returned to hyper.
 pub type Response = Result<hyper::Response<BoxBody<Bytes, hyper::Error>>, hyper::Error>;
+/// The return type of async request handlers.
 pub type ResponseFut = dyn Future<Output = Response> + Send + 'static;
 
+/// A function pointer type for HTTP request handlers.
 pub type Handler<Extra> = fn(Request<Incoming>, Context<Extra>) -> Pin<Box<ResponseFut>>;
 
+/// A route representing a single endpoint (including all matching dynamic segments and HTTP methods).
 pub struct Route<Extra: Send + Sync> {
     pub path: Path,
     handlers: HashMap<Method, Handler<Extra>>,
 }
 
-impl<Extra: Send + Sync> Clone for Route<Extra> {
-    fn clone(&self) -> Self {
-        Self {
-            path: Clone::clone(&self.path),
-            handlers: Clone::clone(&self.handlers),
-        }
-    }
-}
-
 impl<Extra: Send + Sync> Route<Extra> {
+    /// Constructs a new `Route<Extra>` with the provided path.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use radmin_router::{path, Route};
+    /// Route::<()>::new(path!("/path/[to]/resource"));
+    /// ```
     pub fn new(path: impl Into<Path>) -> Self {
         Self {
             path: path.into(),
@@ -35,6 +38,7 @@ impl<Extra: Send + Sync> Route<Extra> {
         }
     }
 
+    /// Returns the methods for which this route has registered handlers.
     pub fn allowed_methods(&self) -> Vec<Method> {
         self.handlers.keys().map(|m| m.clone()).collect()
     }
@@ -43,45 +47,63 @@ impl<Extra: Send + Sync> Route<Extra> {
         self.handlers.get(method).cloned()
     }
 
-    fn register(&mut self, method: Method, handler: Handler<Extra>) -> &mut Self {
+    fn register(mut self, method: Method, handler: Handler<Extra>) -> Self {
         self.handlers.insert(method, handler);
         self
     }
 
-    pub fn get(&mut self, handler: Handler<Extra>) -> &mut Self {
+    /// Registers a handler for GET requests.
+    pub fn get(self, handler: Handler<Extra>) -> Self {
         self.register(Method::GET, handler)
     }
 
-    pub fn post(&mut self, handler: Handler<Extra>) -> &mut Self {
+    /// Registers a handler for POST requests.
+    pub fn post(self, handler: Handler<Extra>) -> Self {
         self.register(Method::POST, handler)
     }
 
-    pub fn put(&mut self, handler: Handler<Extra>) -> &mut Self {
+    /// Registers a handler for PUT requests.
+    pub fn put(self, handler: Handler<Extra>) -> Self {
         self.register(Method::PUT, handler)
     }
 
-    pub fn delete(&mut self, handler: Handler<Extra>) -> &mut Self {
+    /// Registers a handler for DELETE requests.
+    pub fn delete(self, handler: Handler<Extra>) -> Self {
         self.register(Method::DELETE, handler)
     }
 
-    pub fn head(&mut self, handler: Handler<Extra>) -> &mut Self {
+    /// Registers a handler for HEAD requests.
+    pub fn head(self, handler: Handler<Extra>) -> Self {
         self.register(Method::HEAD, handler)
     }
 
-    pub fn options(&mut self, handler: Handler<Extra>) -> &mut Self {
+    /// Registers a handler for OPTIONS requests.
+    pub fn options(self, handler: Handler<Extra>) -> Self {
         self.register(Method::OPTIONS, handler)
     }
 
-    pub fn connect(&mut self, handler: Handler<Extra>) -> &mut Self {
+    /// Registers a handler for CONNECT requests.
+    pub fn connect(self, handler: Handler<Extra>) -> Self {
         self.register(Method::CONNECT, handler)
     }
 
-    pub fn patch(&mut self, handler: Handler<Extra>) -> &mut Self {
+    /// Registers a handler for PATCH requests.
+    pub fn patch(self, handler: Handler<Extra>) -> Self {
         self.register(Method::PATCH, handler)
     }
 
-    pub fn trace(&mut self, handler: Handler<Extra>) -> &mut Self {
+    /// Registers a handler for TRACE requests.
+    pub fn trace(self, handler: Handler<Extra>) -> Self {
         self.register(Method::TRACE, handler)
+    }
+}
+
+impl<Extra: Send + Sync> Clone for Route<Extra> {
+    fn clone(&self) -> Self {
+        Self {
+            path: Clone::clone(&self.path),
+            handlers: Clone::clone(&self.handlers),
+        }
     }
 }
 
@@ -104,11 +126,18 @@ mod tests {
     #[test]
     fn allowed_methods() {
         let mut route = Route::<()>::new(vec![]);
-        route
+        route = route
             .get(|_, _| unimplemented!())
             .patch(|_, _| unimplemented!());
 
-        assert_eq!(route.allowed_methods(), vec![Method::GET, Method::PATCH]);
+        let mut allowed_methods = route.allowed_methods()
+            .into_iter()
+            .map(|m| m.to_string())
+            .collect::<Vec<_>>();
+        allowed_methods.sort();
+        let allowed_methods = allowed_methods.join(", ");
+        
+        assert_eq!(allowed_methods, "GET, PATCH");
     }
 
     #[test]
@@ -116,7 +145,7 @@ mod tests {
         let mut route = Route::<()>::new(vec![]);
         assert!(route.handler(&Method::GET).is_none());
 
-        route.get(|_, _| unimplemented!());
+        route = route.get(|_, _| unimplemented!());
         assert!(route.handler(&Method::GET).is_some());
     }
 }
